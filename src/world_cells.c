@@ -93,7 +93,6 @@ static
 void FindWorldCell(ecs_iter_t *it) {
     while (ecs_query_next_table(it)) {
         if (!ecs_query_changed(NULL, it)) {
-            ecs_query_skip(it);
             continue;
         }
 
@@ -112,7 +111,6 @@ static
 void SetWorldCell(ecs_iter_t *it) {
     while (ecs_query_next_table(it)) {
         if (!ecs_query_changed(NULL, it)) {
-            ecs_query_skip(it);
             continue;
         }
 
@@ -121,7 +119,6 @@ void SetWorldCell(ecs_iter_t *it) {
         ecs_world_t *world = it->world;
         WorldCellCache *wcache = ecs_field(it, WorldCellCache, 1);
         WorldCells *wcells = ecs_field(it, WorldCells, 2);
-        bool changed = false;
 
         for (int i = 0; i < it->count; i ++) {
             WorldCellCache *cur = &wcache[i];
@@ -129,12 +126,7 @@ void SetWorldCell(ecs_iter_t *it) {
             if (cur->cell_id != cur->old_cell_id) {
                 ecs_entity_t cell = flecs_game_get_cell(world, wcells, cur);
                 ecs_add_pair(world, it->entities[i], ecs_id(EcsWorldCell), cell);
-                changed = true;
             }
-        }
-
-        if (!changed) {
-            ecs_query_skip(it);
         }
     }
 }
@@ -143,7 +135,6 @@ static
 void ResetWorldCellCache(ecs_iter_t *it) {
     while (ecs_query_next_table(it)) {
         if (!ecs_query_changed(NULL, it)) {
-            ecs_query_skip(it);
             continue;
         }
 
