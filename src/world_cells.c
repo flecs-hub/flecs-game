@@ -16,6 +16,7 @@ typedef struct WorldCellCache {
     uint64_t cell_id;
     uint64_t old_cell_id;
     int8_t quadrant;
+    int8_t old_quadrant;
 } WorldCellCache;
 
 static
@@ -123,7 +124,7 @@ void SetWorldCell(ecs_iter_t *it) {
         for (int i = 0; i < it->count; i ++) {
             WorldCellCache *cur = &wcache[i];
 
-            if (cur->cell_id != cur->old_cell_id) {
+            if (cur->cell_id != cur->old_cell_id || cur->quadrant != cur->old_quadrant) {
                 ecs_entity_t cell = flecs_game_get_cell(world, wcells, cur);
                 ecs_add_pair(world, it->entities[i], ecs_id(EcsWorldCell), cell);
             }
@@ -145,8 +146,9 @@ void ResetWorldCellCache(ecs_iter_t *it) {
 
         for (int i = 0; i < it->count; i ++) {
             WorldCellCache *cur = &wcache[i];
-            if (cur->old_cell_id != cur->cell_id) {
+            if (cur->old_cell_id != cur->cell_id || cur->old_quadrant != cur->quadrant) {
                 cur->old_cell_id = cur->cell_id;
+                cur->old_quadrant = cur->quadrant;
                 changed = true;
             }
         }
@@ -207,6 +209,11 @@ void FlecsGameWorldCellsImport(ecs_world_t *world) {
                 .inout = EcsIn,
                 .src.flags = EcsSelf,
                 .src.id = ecs_id(WorldCells)
+            }, {
+                .id = ecs_pair(EcsWorldCell, EcsWildcard),
+                .inout = EcsOut,
+                .src.id = 0,
+                .src.flags = EcsIsEntity
             }}
         },
         .run = SetWorldCell

@@ -1,7 +1,7 @@
 #include <flecs_game.h>
 
-static const float CameraAccelerationFactor = 50.0;
-static const float CameraDecelerationC = 0.5;
+static const float CameraAccelerationFactor = 40.0;
+static const float CameraDecelerationC = 0.3;
 static const float CameraAngularAccelerationFactor = 5.0;
 static const float CameraAngularDecelerationC = 2.0;
 static const float CameraMaxAngularSpeed = 1.5;
