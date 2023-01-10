@@ -7,8 +7,6 @@ ECS_CTOR(EcsCameraController, ptr, {
     ptr->gear = 5.0;
 })
 
-ECS_DECLARE(EcsWorldCell);
-
 void FlecsGameCameraControllerImport(ecs_world_t *world);
 void FlecsGameWorldCellsImport(ecs_world_t *world);
 
