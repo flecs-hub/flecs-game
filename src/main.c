@@ -2,10 +2,7 @@
 
 #include <flecs_game.h>
 
-ECS_CTOR(EcsCameraController, ptr, {
-    ecs_os_zeromem(ptr);
-    ptr->gear = 5.0;
-})
+ECS_DECLARE(EcsCameraController);
 
 void FlecsGameCameraControllerImport(ecs_world_t *world);
 void FlecsGameWorldCellsImport(ecs_world_t *world);
@@ -21,12 +18,9 @@ void FlecsGameImport(ecs_world_t *world) {
 
     ecs_set_name_prefix(world, "Ecs");
 
-    ECS_META_COMPONENT(world, EcsCameraController);
+    ECS_TAG_DEFINE(world, EcsCameraController);
+    ECS_META_COMPONENT(world, EcsCameraAutoMove);
     ECS_META_COMPONENT(world, EcsWorldCellCoord);
-
-    ecs_set_hooks(world, EcsCameraController, {
-        .ctor = ecs_ctor(EcsCameraController)
-    });
 
     FlecsGameCameraControllerImport(world);
     FlecsGameWorldCellsImport(world);

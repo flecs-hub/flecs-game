@@ -1,25 +1,13 @@
 #include <flecs_game.h>
 
-static const float CameraAccelerationFactor = 40.0;
-static const float CameraDecelerationC = 0.3;
-static const float CameraAngularAccelerationFactor = 5.0;
-static const float CameraAngularDecelerationC = 2.0;
-static const float CameraMaxAngularSpeed = 1.5;
-static const float CameraGearFactor = 5.0;
+#define CAMERA_DECELERATION 100.0
+#define CAMERA_ANGULAR_DECELERATION 5.0
 
-static
-void camera_controller_decel(float *v_ptr, float a) {
-    float v = v_ptr[0];
-
-    if (v > 0) {
-        v = glm_clamp(v - a, 0, v);
-    }
-    if (v < 0) {
-        v = glm_clamp(v + a, v, 0);
-    }
-
-    v_ptr[0] = v;
-}
+static const float CameraDeceleration = CAMERA_DECELERATION;
+static const float CameraAcceleration = 50.0 + CAMERA_DECELERATION;
+static const float CameraAngularDeceleration = CAMERA_ANGULAR_DECELERATION;
+static const float CameraAngularAcceleration = 2.5 + CAMERA_ANGULAR_DECELERATION;
+static const float CameraMaxSpeed = 50.0;
 
 static
 void CameraControllerAddPosition(ecs_iter_t *it) {
@@ -80,170 +68,176 @@ void CameraControllerAccelerate(ecs_iter_t *it) {
     EcsRotation3 *r = ecs_field(it, EcsRotation3, 2);
     EcsVelocity3 *v = ecs_field(it, EcsVelocity3, 3);
     EcsAngularVelocity *av = ecs_field(it, EcsAngularVelocity, 4);
-    EcsCameraController *cc = ecs_field(it, EcsCameraController, 5);
-
-    vec3 zero = {0};
-    float dt = it->delta_time;
-    float dt_accel = dt * CameraAccelerationFactor;
-    float dt_angular_accel = dt * CameraAngularAccelerationFactor;
-    float dt_decel = dt * CameraAccelerationFactor * CameraDecelerationC;
-    float dt_angular_decel = dt * CameraAngularAccelerationFactor * CameraAngularDecelerationC;
 
     for (int i = 0; i < it->count; i ++) {
-        float gear = cc[i].gear;
-        float max_speed = gear * CameraGearFactor;
-        float accel = gear * dt_accel;
-        float angular_accel = dt_angular_accel;
         float angle = r[i].y;
-        vec3 v3 = {v[i].x, v[i].y, v[i].z}, vn3;
-        vec3 av3 = {av[i].x, av[i].y, av[i].z};
-        float speed = glm_vec3_distance(zero, v3);
-        float angular_speed = glm_vec3_distance(zero, av3);
-        bool did_accel = false, did_angular_accel = false;
+        float accel = CameraAcceleration * it->delta_time;
+        float angular_accel = CameraAngularAcceleration * it->delta_time;
 
         // Camera XZ movement
-        if (speed < max_speed) {
-            if (input->keys[ECS_KEY_W].state) {
-                v[i].x += sin(angle) * accel;
-                v[i].z += cos(angle) * accel;
-                did_accel = true;
-            }
-            if (input->keys[ECS_KEY_S].state) {
-                v[i].x += sin(angle + GLM_PI) * accel;
-                v[i].z += cos(angle + GLM_PI) * accel;
-                did_accel = true;
-            }
-
-            if (input->keys[ECS_KEY_D].state) {
-                v[i].x += cos(angle) * accel;
-                v[i].z -= sin(angle) * accel;
-                did_accel = true;
-            }
-            if (input->keys[ECS_KEY_A].state) {
-                v[i].x += cos(angle + GLM_PI) * accel;
-                v[i].z -= sin(angle + GLM_PI) * accel;
-                did_accel = true;
-            }
-
-            // Camera Y movement
-            if (input->keys[ECS_KEY_E].state) {
-                v[i].y -= accel;
-                did_accel = true;
-            }
-            if (input->keys[ECS_KEY_Q].state) {
-                v[i].y += accel;
-                did_accel = true;
-            }
+        if (input->keys[ECS_KEY_W].state) {
+            v[i].x += sin(angle) * accel;
+            v[i].z += cos(angle) * accel;
+        }
+        if (input->keys[ECS_KEY_S].state) {
+            v[i].x += sin(angle + GLM_PI) * accel;
+            v[i].z += cos(angle + GLM_PI) * accel;
         }
 
-        if (speed && !did_accel) {
-            float decel = gear * dt_decel;
-            glm_vec3_normalize_to(v3, vn3);
-            camera_controller_decel(&v[i].x, decel * fabs(vn3[0]));
-            camera_controller_decel(&v[i].y, decel * fabs(vn3[1]));
-            camera_controller_decel(&v[i].z, decel * fabs(vn3[2]));
+        if (input->keys[ECS_KEY_D].state) {
+            v[i].x += cos(angle) * accel;
+            v[i].z -= sin(angle) * accel;
+        }
+        if (input->keys[ECS_KEY_A].state) {
+            v[i].x += cos(angle + GLM_PI) * accel;
+            v[i].z -= sin(angle + GLM_PI) * accel;
+        }
+
+        // Camera Y movement
+        if (input->keys[ECS_KEY_E].state) {
+            v[i].y += accel;
+        }
+        if (input->keys[ECS_KEY_Q].state) {
+            v[i].y -= accel;
         }
 
         // Camera Y rotation
-        if (angular_speed < CameraMaxAngularSpeed) {
-            if (input->keys[ECS_KEY_RIGHT].state) {
-                av[i].y += angular_accel;
-                did_angular_accel = true;
-            }
-            if (input->keys[ECS_KEY_LEFT].state) {
-                av[i].y -= angular_accel;
-                did_angular_accel = true;
-            }
-
-            // Camera X rotation
-            if (input->keys[ECS_KEY_UP].state) {
-                av[i].x -= angular_accel;
-                did_angular_accel = true;
-            }
-            if (input->keys[ECS_KEY_DOWN].state) {
-                av[i].x += angular_accel;
-                did_angular_accel = true;
-            }
+        if (input->keys[ECS_KEY_LEFT].state) {
+            av[i].y -= angular_accel;
+        }
+        if (input->keys[ECS_KEY_RIGHT].state) {
+            av[i].y += angular_accel;
         }
 
-        if (!did_angular_accel) {
-            camera_controller_decel(&av[i].x, dt_angular_decel);
-            camera_controller_decel(&av[i].y, dt_angular_decel);
+        // Camera X rotation
+        if (input->keys[ECS_KEY_UP].state) {
+            av[i].x += angular_accel;
         }
-
-        // Gear selection
-        if (input->keys[ECS_KEY_COMMA].state) {
-            gear -= dt * 10;
+        if (input->keys[ECS_KEY_DOWN].state) {
+            av[i].x -= angular_accel;
         }
-        if (input->keys[ECS_KEY_PERIOD].state) {
-            gear += dt * 10;
-        }
-        cc[i].gear = glm_max(0.1, gear);
     }
 }
 
 static
-void CameraLimitY(ecs_iter_t *it) {
-    EcsPosition3 *p = ecs_field(it, EcsPosition3, 1);
-    EcsVelocity3 *v = ecs_field(it, EcsVelocity3, 2);
-    EcsCameraController *cc = ecs_field(it, EcsCameraController, 3);
+void camera_controller_decel(float *v_ptr, float a, float dt) {
+    float v = v_ptr[0];
+
+    if (v > 0) {
+        v = glm_clamp(v - a * dt, 0, v);
+    }
+    if (v < 0) {
+        v = glm_clamp(v + a * dt, v, 0);
+    }
+
+    v_ptr[0] = v;
+}
+
+static
+void CameraControllerDecelerate(ecs_iter_t *it) {
+    EcsVelocity3 *v = ecs_field(it, EcsVelocity3, 1);
+    EcsAngularVelocity *av = ecs_field(it, EcsAngularVelocity, 2);
+    EcsRotation3 *r = ecs_field(it, EcsRotation3, 3);
+
+    float dt = it->delta_time;
+
+    vec3 zero = {0};
 
     for (int i = 0; i < it->count; i ++) {
-        if (cc[i].limit_y) {
-            float y = p[i].y;
-            float vy = v[i].y * it->delta_time;
-            float max_y = cc[i].max_y;
+        vec3 v3 = {v[i].x, v[i].y, v[i].z}, vn3;
+        glm_vec3_normalize_to(v3, vn3);
+        
+        float speed = glm_vec3_distance(zero, v3);
+        if (speed > CameraMaxSpeed) {
+            glm_vec3_scale(v3, CameraMaxSpeed / speed, v3);
+            v[i].x = v3[0];
+            v[i].y = v3[1];
+            v[i].z = v3[2];
+        }
 
-            if ((y + vy) > max_y) {
-                if (vy > 0) {
-                    v[i].y = 0;
-                }
-            }
+        camera_controller_decel(&v[i].x, CameraDeceleration * fabs(vn3[0]), dt);
+        camera_controller_decel(&v[i].y, CameraDeceleration * fabs(vn3[1]), dt);
+        camera_controller_decel(&v[i].z, CameraDeceleration * fabs(vn3[2]), dt);
+
+        camera_controller_decel(&av[i].x, CameraAngularDeceleration, dt);
+        camera_controller_decel(&av[i].y, CameraAngularDeceleration, dt);
+
+        if (r[i].x > M_PI / 2.0) {
+            r[i].x = M_PI / 2.0 - 0.0001;
+            av[i].x = 0;
+        }
+        if (r[i].x < -M_PI / 2.0) {
+            r[i].x = -(M_PI / 2.0) + 0.0001;
+            av[i].x = 0;
+        }
+    }
+}
+
+static
+void CameraAutoMove(ecs_iter_t *it) {
+    EcsVelocity3 *v = ecs_field(it, EcsVelocity3, 1);
+    EcsCameraAutoMove *m = ecs_field(it, EcsCameraAutoMove, 2);
+
+    float dt = it->delta_time;
+
+    for (int i = 0; i < it->count; i ++) {
+        EcsVelocity3 *vcur = &v[i];
+        m->t += dt;
+        if ((m->t < m->after) && (vcur->x || vcur->y || vcur->z)) {
+            m->t = 0;
+        }
+        if (m->t > m->after) {
+            vcur->z = 10;
         }
     }
 }
 
 void FlecsGameCameraControllerImport(ecs_world_t *world) {
     ECS_SYSTEM(world, CameraControllerAddPosition, EcsOnLoad,
-        [filter] flecs.components.graphics.Camera,
-        [filter] CameraController,
+        [none]   flecs.components.graphics.Camera,
+        [none]   CameraController,
         [out]    !flecs.components.transform.Position3);
 
     ECS_SYSTEM(world, CameraControllerAddRotation, EcsOnLoad,
-        [filter] flecs.components.graphics.Camera,
-        [filter] CameraController,
+        [none]   flecs.components.graphics.Camera,
+        [none]   CameraController,
         [out]    !flecs.components.transform.Rotation3);
 
     ECS_SYSTEM(world, CameraControllerAddVelocity, EcsOnLoad,
-        [filter] flecs.components.graphics.Camera,
-        [filter] CameraController,
+        [none]   flecs.components.graphics.Camera,
+        [none]   CameraController,
         [out]    !flecs.components.physics.Velocity3);
 
     ECS_SYSTEM(world, CameraControllerAddAngularVelocity, EcsOnLoad,
-        [filter] flecs.components.graphics.Camera,
-        [filter] CameraController,
+        [none]   flecs.components.graphics.Camera,
+        [none]   CameraController,
         [out]    !flecs.components.physics.AngularVelocity);
 
     ECS_SYSTEM(world, CameraControllerSyncPosition, EcsOnUpdate,
         [out]    flecs.components.graphics.Camera, 
         [in]     flecs.components.transform.Position3,
-        [filter] CameraController);
+        [none]   CameraController);
 
     ECS_SYSTEM(world, CameraControllerSyncRotation, EcsOnUpdate,
         [out]    flecs.components.graphics.Camera, 
         [in]     flecs.components.transform.Position3,
         [in]     flecs.components.transform.Rotation3,
-        [filter] CameraController);
+        [none]   CameraController);
 
     ECS_SYSTEM(world, CameraControllerAccelerate, EcsOnUpdate,
         [in]     flecs.components.input.Input($),
         [in]     flecs.components.transform.Rotation3,
         [inout]  flecs.components.physics.Velocity3,
         [inout]  flecs.components.physics.AngularVelocity,
-        [in]     CameraController);
+        [none]   CameraController);
 
-    ECS_SYSTEM(world, CameraLimitY, EcsOnUpdate,
-        [inout]  flecs.components.transform.Position3,
+    ECS_SYSTEM(world, CameraControllerDecelerate, EcsOnUpdate,
         [inout]  flecs.components.physics.Velocity3,
-        [filter] CameraController);
+        [inout]  flecs.components.physics.AngularVelocity,
+        [inout]  flecs.components.transform.Rotation3,
+        [none]   CameraController);
+
+    ECS_SYSTEM(world, CameraAutoMove, EcsOnUpdate,
+        [inout]  flecs.components.physics.Velocity3,
+        [inout]  CameraAutoMove);
 }

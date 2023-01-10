@@ -1,6 +1,7 @@
 #include <flecs_game.h>
 
 ECS_DECLARE(EcsWorldCell);
+ECS_DECLARE(EcsWorldCellRoot);
 ECS_COMPONENT_DECLARE(WorldCells);
 ECS_COMPONENT_DECLARE(WorldCellCache);
 
@@ -54,6 +55,7 @@ ecs_entity_t flecs_game_get_cell(
     ecs_entity_t cell = *cell_ptr;
     if (!cell) {
         cell = *cell_ptr = ecs_new(world, EcsWorldCell);
+        ecs_add_pair(world, cell, EcsChildOf, EcsWorldCellRoot);
 
         // Decode cell coordinates from spatial hash
         int32_t left = (int32_t)cell_id;
@@ -167,6 +169,11 @@ void FlecsGameWorldCellsImport(ecs_world_t *world) {
 
     ecs_set_hooks(world, WorldCells, {
         .ctor = ecs_default_ctor
+    });
+
+    EcsWorldCellRoot = ecs_entity(world, {
+        .name = "::game.worldcells",
+        .root_sep = "::"
     });
 
     ECS_SYSTEM(world, AddWorldCellCache, EcsOnLoad,

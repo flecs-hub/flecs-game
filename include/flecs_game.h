@@ -22,14 +22,20 @@ extern "C" {
 #endif
 
 FLECS_GAME_API
-ECS_STRUCT(EcsCameraController, {
-    bool limit_y;
-    float max_y;
-    float gear;
+extern ECS_DECLARE(EcsCameraController);
+
+FLECS_GAME_API
+ECS_STRUCT(EcsCameraAutoMove, {
+    float after;
+    float speed;
+    float t;
 });
 
 FLECS_GAME_API
 extern ECS_DECLARE(EcsWorldCell);
+
+FLECS_GAME_API
+extern ECS_DECLARE(EcsWorldCellRoot);
 
 FLECS_GAME_API
 ECS_STRUCT(EcsWorldCellCoord, {
@@ -47,20 +53,25 @@ void FlecsGameImport(ecs_world_t *world);
 
 #ifdef __cplusplus
 #ifndef FLECS_NO_CPP
+#include <iostream>
 
 namespace flecs {
 
 struct game {
-    using CameraController = EcsCameraController;
+    static flecs::entity_t CameraController;
 
     game(flecs::world& ecs) {
         // Load module contents
         FlecsGameImport(ecs);
 
+        CameraController = EcsCameraController;
+
         // Bind C++ types with module contents
         ecs.module<flecs::game>();
     }
 };
+
+flecs::entity_t game::CameraController = 0;
 
 }
 
@@ -68,4 +79,3 @@ struct game {
 #endif
 
 #endif
-
