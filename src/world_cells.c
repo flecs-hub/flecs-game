@@ -50,8 +50,8 @@ ecs_entity_t flecs_game_get_cell(
 {
     int8_t quadrant = wcache->quadrant;
     uint64_t cell_id = wcache->cell_id;
-    ecs_entity_t *cell_ptr = ecs_map_ensure(&wcells->quadrants[quadrant].cells, 
-        ecs_entity_t, cell_id);
+    ecs_entity_t *cell_ptr = ecs_map_ensure(
+        &wcells->quadrants[quadrant].cells, cell_id);
     ecs_entity_t cell = *cell_ptr;
     if (!cell) {
         cell = *cell_ptr = ecs_new(world, EcsWorldCell);
@@ -242,8 +242,8 @@ void FlecsGameWorldCellsImport(ecs_world_t *world) {
     });
 
     WorldCells *wcells = ecs_singleton_get_mut(world, WorldCells);
-    ecs_map_init(&wcells->quadrants[0].cells, ecs_entity_t, NULL, 1);
-    ecs_map_init(&wcells->quadrants[1].cells, ecs_entity_t, NULL, 1);
-    ecs_map_init(&wcells->quadrants[2].cells, ecs_entity_t, NULL, 1);
-    ecs_map_init(&wcells->quadrants[3].cells, ecs_entity_t, NULL, 1);
+    ecs_map_init(&wcells->quadrants[0].cells, NULL);
+    ecs_map_init(&wcells->quadrants[1].cells, NULL);
+    ecs_map_init(&wcells->quadrants[2].cells, NULL);
+    ecs_map_init(&wcells->quadrants[3].cells, NULL);
 }
