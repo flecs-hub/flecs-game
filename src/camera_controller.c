@@ -7,7 +7,7 @@ static const float CameraDeceleration = CAMERA_DECELERATION;
 static const float CameraAcceleration = 50.0 + CAMERA_DECELERATION;
 static const float CameraAngularDeceleration = CAMERA_ANGULAR_DECELERATION;
 static const float CameraAngularAcceleration = 2.5 + CAMERA_ANGULAR_DECELERATION;
-static const float CameraMaxSpeed = 50.0;
+static const float CameraMaxSpeed = 40.0;
 
 static
 void CameraControllerAddPosition(ecs_iter_t *it) {
@@ -59,6 +59,18 @@ void CameraControllerSyncRotation(ecs_iter_t *it) {
         camera[i].lookat[0] = p[i].x + sin(r[i].y) * cos(r[i].x);
         camera[i].lookat[1] = p[i].y + sin(r[i].x);
         camera[i].lookat[2] = p[i].z + cos(r[i].y) * cos(r[i].x);;
+    }
+}
+
+static
+void CameraControllerSyncLookAt(ecs_iter_t *it) {
+    EcsCamera *camera = ecs_field(it, EcsCamera, 1);
+    EcsLookAt *lookat = ecs_field(it, EcsLookAt, 2);
+
+    for (int i = 0; i < it->count; i ++) {
+        camera[i].lookat[0] = lookat[i].x;
+        camera[i].lookat[1] = lookat[i].y;
+        camera[i].lookat[2] = lookat[i].z;
     }
 }
 
@@ -222,6 +234,11 @@ void FlecsGameCameraControllerImport(ecs_world_t *world) {
         [out]    flecs.components.graphics.Camera, 
         [in]     flecs.components.transform.Position3,
         [in]     flecs.components.transform.Rotation3,
+        [none]   CameraController);
+
+    ECS_SYSTEM(world, CameraControllerSyncLookAt, EcsOnUpdate,
+        [out]    flecs.components.graphics.Camera, 
+        [in]     flecs.components.graphics.LookAt,
         [none]   CameraController);
 
     ECS_SYSTEM(world, CameraControllerAccelerate, EcsOnUpdate,

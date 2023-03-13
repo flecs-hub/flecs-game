@@ -45,6 +45,31 @@ ECS_STRUCT(EcsWorldCellCoord, {
 });
 
 FLECS_GAME_API
+ECS_STRUCT(ecs_grid_slot_t, {
+    ecs_entity_t prefab;
+    float chance;
+});
+
+FLECS_GAME_API
+ECS_STRUCT(ecs_grid_coord_t, {
+    int32_t count;
+    float spacing;
+    float variation;
+});
+
+FLECS_GAME_API
+ECS_STRUCT(EcsGrid, {
+    ecs_grid_coord_t x;
+    ecs_grid_coord_t y;
+    ecs_grid_coord_t z;
+
+    EcsPosition3 border;
+
+    ecs_entity_t prefab;
+    ecs_grid_slot_t variations[20];
+});
+
+FLECS_GAME_API
 void FlecsGameImport(ecs_world_t *world);
 
 #ifdef __cplusplus
