@@ -7,6 +7,7 @@
             "flecs",
             "flecs.components.input",
             "flecs.components.graphics",
+            "flecs.components.gui",
             "flecs.components.transform",
             "flecs.components.geometry",
             "flecs.components.physics",

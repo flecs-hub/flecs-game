@@ -7,6 +7,7 @@
 ECS_DECLARE(EcsCameraController);
 
 void FlecsGameCameraControllerImport(ecs_world_t *world);
+void FlecsGameLightControllerImport(ecs_world_t *world);
 void FlecsGameWorldCellsImport(ecs_world_t *world);
 
 static
@@ -29,40 +30,60 @@ typedef struct {
     float z_var;
     float variations_total;
     int32_t variations_count;
+    ecs_entity_t variations[VARIATION_SLOTS_MAX];
+    ecs_entity_t prefab;
 } flecs_grid_params_t;
 
 static
-void generate_tile(
+ecs_entity_t get_prefab(
+    ecs_world_t *world, 
+    ecs_entity_t parent,
+    ecs_entity_t prefab) 
+{
+    if (!prefab) {
+        return 0;
+    }
+
+    /* If prefab is a script/assembly, create a private instance of the
+     * assembly for the grid with default values. This allows applications to
+     * use assemblies directly vs. having to create a dummy prefab */
+    ecs_entity_t result = prefab;
+    if (ecs_has(world, prefab, EcsScript) && ecs_has(world, prefab, EcsComponent)) {
+        result = ecs_new_w_pair(world, EcsChildOf, parent);
+        ecs_add_id(world, result, EcsPrefab);
+        ecs_add_id(world, result, prefab);
+    }
+    return result;
+}
+
+static
+ecs_entity_t generate_tile(
     ecs_world_t *world,
     const EcsGrid *grid,
-    int32_t x,
-    int32_t y,
-    int32_t z,
+    float xc,
+    float yc,
+    float zc,
     const flecs_grid_params_t *params)
 {
-    float xc = (float)x * params->x_spacing - params->x_half;
-    float yc = (float)y * params->y_spacing - params->y_half;
-    float zc = (float)z * params->z_spacing - params->z_half;
-
     if (params->x_var) {
-        xc += randf(params->x_var / 2) - params->x_var;
+        xc += randf(params->x_var) - params->x_var / 2;
     }
     if (params->y_var) {
-        yc += randf(params->y_var / 2) - params->y_var;
+        yc += randf(params->y_var) - params->y_var / 2;
     }
     if (params->z_var) {
-        zc += randf(params->z_var / 2) - params->z_var;
+        zc += randf(params->z_var) - params->z_var / 2;
     }
 
     ecs_entity_t slot = 0;
-    if (grid->prefab) {
-        slot = grid->prefab;
+    if (params->prefab) {
+        slot = params->prefab;
     } else {
         float p = randf(params->variations_total), cur = 0;
         for (int v = 0; v < params->variations_count; v ++) {
             cur += grid->variations[v].chance;
             if (p <= cur) {
-                slot = grid->variations[v].prefab;
+                slot = params->variations[v];
                 break;
             }
         }
@@ -70,10 +91,15 @@ void generate_tile(
 
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, slot);
     ecs_set(world, inst, EcsPosition3, {xc, yc, zc});
+    return inst;
 }
 
 static
-void generate_grid(ecs_world_t *world, ecs_entity_t parent, const EcsGrid *grid) {
+void generate_grid(
+    ecs_world_t *world, 
+    ecs_entity_t parent, 
+    const EcsGrid *grid) 
+{
     flecs_grid_params_t params = {0};
 
     params.x_count = glm_max(1, grid->x.count);
@@ -108,9 +134,13 @@ void generate_grid(ecs_world_t *world, ecs_entity_t parent, const EcsGrid *grid)
             if (!grid->variations[i].prefab) {
                 break;
             }
+            params.variations[i] = get_prefab(world, parent, 
+                grid->variations[i].prefab);
             params.variations_total += grid->variations[i].chance;
             params.variations_count ++;
         }
+    } else {
+        prefab = params.prefab = get_prefab(world, parent, prefab);
     }
 
     if (!prefab && !params.variations_count) {
@@ -121,25 +151,29 @@ void generate_grid(ecs_world_t *world, ecs_entity_t parent, const EcsGrid *grid)
         for (int32_t x = 0; x < params.x_count; x ++) {
             for (int32_t y = 0; y < params.y_count; y ++) {
                 for (int32_t z = 0; z < params.z_count; z ++) {
-                    generate_tile(world, grid, x, y, z, &params);
+                    float xc = (float)x * params.x_spacing - params.x_half;
+                    float yc = (float)y * params.y_spacing - params.y_half;
+                    float zc = (float)z * params.z_spacing - params.z_half;
+                    generate_tile(world, grid, xc, yc, zc, &params);
                 }
             }
         }
     } else {
         for (int32_t x = 0; x < params.x_count; x ++) {
-            generate_tile(world, grid, x, 0, 0, &params);
-            generate_tile(world, grid, 
-                x, params.y_count - 1, params.z_count - 1, &params);
+            float xc = (float)x * params.x_spacing - params.x_half;
+            float zc = grid->border.z / 2 + grid->border_offset.z;
+            generate_tile(world, grid, xc, 0, -zc, &params);
+            generate_tile(world, grid, xc, 0, zc, &params);
         }
-        for (int32_t y = 1; y < params.y_count - 1; y ++) {
-            generate_tile(world, grid, 0, y, 0, &params);
-            generate_tile(world, grid, 
-                params.x_count - 1, y, params.z_count - 1, &params);
-        }
-        for (int32_t z = 1; z < params.z_count - 1; z ++) {
-            generate_tile(world, grid, 0, 0, z, &params);
-            generate_tile(world, grid, 
-                params.x_count - 1, params.z_count - 1, z, &params);
+
+        for (int32_t x = 0; x < params.z_count; x ++) {
+            float xc = grid->border.x / 2 + grid->border_offset.x;
+            float zc = (float)x * params.z_spacing - params.z_half;
+            ecs_entity_t inst;
+            inst = generate_tile(world, grid, xc, 0, zc, &params);
+            ecs_set(world, inst, EcsRotation3, {0, M_PI / 2, 0});
+            inst = generate_tile(world, grid, -xc, 0, zc, &params);
+            ecs_set(world, inst, EcsRotation3, {0, M_PI / 2, 0});
         }
     }
 }
@@ -161,6 +195,7 @@ void FlecsGameImport(ecs_world_t *world) {
     ECS_IMPORT(world, FlecsComponentsTransform);
     ECS_IMPORT(world, FlecsComponentsPhysics);
     ECS_IMPORT(world, FlecsComponentsGraphics);
+    ECS_IMPORT(world, FlecsComponentsGui);
     ECS_IMPORT(world, FlecsComponentsInput);
     ECS_IMPORT(world, FlecsSystemsPhysics);
 
@@ -169,12 +204,18 @@ void FlecsGameImport(ecs_world_t *world) {
     ECS_TAG_DEFINE(world, EcsCameraController);
     ECS_META_COMPONENT(world, EcsCameraAutoMove);
     ECS_META_COMPONENT(world, EcsWorldCellCoord);
+    ECS_META_COMPONENT(world, EcsTimeOfDay);
     ECS_META_COMPONENT(world, ecs_grid_slot_t);
     ECS_META_COMPONENT(world, ecs_grid_coord_t);
     ECS_META_COMPONENT(world, EcsGrid);
 
     FlecsGameCameraControllerImport(world);
+    FlecsGameLightControllerImport(world);
     FlecsGameWorldCellsImport(world);
+
+    ecs_set_hooks(world, EcsTimeOfDay, {
+        .ctor = ecs_default_ctor
+    });
 
     ECS_OBSERVER(world, SetGrid, EcsOnSet, Grid);
 }

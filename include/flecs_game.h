@@ -32,6 +32,12 @@ ECS_STRUCT(EcsCameraAutoMove, {
 });
 
 FLECS_GAME_API
+ECS_STRUCT(EcsTimeOfDay, {
+    float t;
+    float speed;
+});
+
+FLECS_GAME_API
 extern ECS_DECLARE(EcsWorldCell);
 
 FLECS_GAME_API
@@ -64,6 +70,7 @@ ECS_STRUCT(EcsGrid, {
     ecs_grid_coord_t z;
 
     EcsPosition3 border;
+    EcsPosition3 border_offset;
 
     ecs_entity_t prefab;
     ecs_grid_slot_t variations[20];
