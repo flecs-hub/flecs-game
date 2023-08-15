@@ -49,7 +49,7 @@ ecs_entity_t get_prefab(
      * use assemblies directly vs. having to create a dummy prefab */
     ecs_entity_t result = prefab;
     if (ecs_has(world, prefab, EcsScript) && ecs_has(world, prefab, EcsComponent)) {
-        result = ecs_new_w_pair(world, EcsChildOf, parent);
+        result = ecs_new(world, 0);
         ecs_add_id(world, result, EcsPrefab);
         ecs_add_id(world, result, prefab);
     }
@@ -126,6 +126,8 @@ void generate_grid(
     params.y_var = grid->y.variation;
     params.z_var = grid->z.variation;
 
+    ecs_entity_t old_scope = ecs_set_scope(world, parent);
+
     ecs_entity_t prefab = grid->prefab;
     params.variations_total = 0;
     params.variations_count = 0;
@@ -176,6 +178,8 @@ void generate_grid(
             ecs_set(world, inst, EcsRotation3, {0, M_PI / 2, 0});
         }
     }
+
+    ecs_set_scope(world, old_scope);
 }
 
 static

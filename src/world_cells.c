@@ -99,7 +99,7 @@ void FindWorldCell(ecs_iter_t *it) {
             continue;
         }
 
-        ecs_query_populate(it);
+        ecs_query_populate(it, false);
 
         EcsPosition3 *pos = ecs_field(it, EcsPosition3, 1);
         WorldCellCache *wcache = ecs_field(it, WorldCellCache, 2);
@@ -117,7 +117,7 @@ void SetWorldCell(ecs_iter_t *it) {
             continue;
         }
 
-        ecs_query_populate(it);
+        ecs_query_populate(it, false);
 
         ecs_world_t *world = it->world;
         WorldCellCache *wcache = ecs_field(it, WorldCellCache, 1);
@@ -141,7 +141,7 @@ void ResetWorldCellCache(ecs_iter_t *it) {
             continue;
         }
 
-        ecs_query_populate(it);
+        ecs_query_populate(it, false);
 
         WorldCellCache *wcache = ecs_field(it, WorldCellCache, 1);
         bool changed = false;
@@ -162,7 +162,6 @@ void ResetWorldCellCache(ecs_iter_t *it) {
 }
 
 void FlecsGameWorldCellsImport(ecs_world_t *world) {
-
     ECS_COMPONENT_DEFINE(world, WorldCellCache);
     ECS_COMPONENT_DEFINE(world, WorldCells);
     ECS_ENTITY_DEFINE(world, EcsWorldCell, Tag, Exclusive);
@@ -180,7 +179,8 @@ void FlecsGameWorldCellsImport(ecs_world_t *world) {
         [none] flecs.components.transform.Position3(self),
         [out]  !flecs.game.WorldCellCache(self),
         [out]  !flecs.game.WorldCell(self),
-        [none] !flecs.components.transform.Position3(up(ChildOf)));
+        [none] !flecs.components.transform.Position3(up(ChildOf)),
+        [none] !(Target, ChildOf));
 
     ecs_system(world, {
         .entity = ecs_entity(world, {

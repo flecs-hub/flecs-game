@@ -70,7 +70,7 @@ void LightControllerTimeOfDay(ecs_iter_t *it) {
     EcsRgb *color = ecs_field(it, EcsRgb, 3);
     EcsLightIntensity *light_intensity = ecs_field(it, EcsLightIntensity, 4);
 
-    static vec3 day = {0.8, 0.8, 0.6};
+    static vec3 day = {0.8, 0.8, 0.75};
     static vec3 twilight = {1.0, 0.1, 0.01};
     float twilight_angle = 0.3;
 
