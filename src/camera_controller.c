@@ -39,8 +39,8 @@ void CameraControllerAddAngularVelocity(ecs_iter_t *it) {
 
 static
 void CameraControllerSyncPosition(ecs_iter_t *it) {
-    EcsCamera *camera = ecs_field(it, EcsCamera, 1);
-    EcsPosition3 *p = ecs_field(it, EcsPosition3, 2);
+    EcsCamera *camera = ecs_field(it, EcsCamera, 0);
+    EcsPosition3 *p = ecs_field(it, EcsPosition3, 1);
 
     for (int i = 0; i < it->count; i ++) {
         camera[i].position[0] = p[i].x;
@@ -51,9 +51,9 @@ void CameraControllerSyncPosition(ecs_iter_t *it) {
 
 static
 void CameraControllerSyncRotation(ecs_iter_t *it) {
-    EcsCamera *camera = ecs_field(it, EcsCamera, 1);
-    EcsPosition3 *p = ecs_field(it, EcsPosition3, 2);
-    EcsRotation3 *r = ecs_field(it, EcsRotation3, 3);
+    EcsCamera *camera = ecs_field(it, EcsCamera, 0);
+    EcsPosition3 *p = ecs_field(it, EcsPosition3, 1);
+    EcsRotation3 *r = ecs_field(it, EcsRotation3, 2);
 
     for (int i = 0; i < it->count; i ++) {
         camera[i].lookat[0] = p[i].x + sin(r[i].y) * cos(r[i].x);
@@ -64,8 +64,8 @@ void CameraControllerSyncRotation(ecs_iter_t *it) {
 
 static
 void CameraControllerSyncLookAt(ecs_iter_t *it) {
-    EcsCamera *camera = ecs_field(it, EcsCamera, 1);
-    EcsLookAt *lookat = ecs_field(it, EcsLookAt, 2);
+    EcsCamera *camera = ecs_field(it, EcsCamera, 0);
+    EcsLookAt *lookat = ecs_field(it, EcsLookAt, 1);
 
     for (int i = 0; i < it->count; i ++) {
         camera[i].lookat[0] = lookat[i].x;
@@ -76,10 +76,10 @@ void CameraControllerSyncLookAt(ecs_iter_t *it) {
 
 static
 void CameraControllerAccelerate(ecs_iter_t *it) {
-    EcsInput *input = ecs_field(it, EcsInput, 1);
-    EcsRotation3 *r = ecs_field(it, EcsRotation3, 2);
-    EcsVelocity3 *v = ecs_field(it, EcsVelocity3, 3);
-    EcsAngularVelocity *av = ecs_field(it, EcsAngularVelocity, 4);
+    EcsInput *input = ecs_field(it, EcsInput, 0);
+    EcsRotation3 *r = ecs_field(it, EcsRotation3, 1);
+    EcsVelocity3 *v = ecs_field(it, EcsVelocity3, 2);
+    EcsAngularVelocity *av = ecs_field(it, EcsAngularVelocity, 3);
 
     for (int i = 0; i < it->count; i ++) {
         float angle = r[i].y;
@@ -147,9 +147,9 @@ void camera_controller_decel(float *v_ptr, float a, float dt) {
 
 static
 void CameraControllerDecelerate(ecs_iter_t *it) {
-    EcsVelocity3 *v = ecs_field(it, EcsVelocity3, 1);
-    EcsAngularVelocity *av = ecs_field(it, EcsAngularVelocity, 2);
-    EcsRotation3 *r = ecs_field(it, EcsRotation3, 3);
+    EcsVelocity3 *v = ecs_field(it, EcsVelocity3, 0);
+    EcsAngularVelocity *av = ecs_field(it, EcsAngularVelocity, 1);
+    EcsRotation3 *r = ecs_field(it, EcsRotation3, 2);
 
     float dt = it->delta_time;
 
@@ -174,12 +174,12 @@ void CameraControllerDecelerate(ecs_iter_t *it) {
         camera_controller_decel(&av[i].x, CameraAngularDeceleration, dt);
         camera_controller_decel(&av[i].y, CameraAngularDeceleration, dt);
 
-        if (r[i].x > M_PI / 2.0) {
-            r[i].x = M_PI / 2.0 - 0.0001;
+        if (r[i].x > GLM_PI / 2.0) {
+            r[i].x = GLM_PI / 2.0 - 0.0001;
             av[i].x = 0;
         }
-        if (r[i].x < -M_PI / 2.0) {
-            r[i].x = -(M_PI / 2.0) + 0.0001;
+        if (r[i].x < -GLM_PI / 2.0) {
+            r[i].x = -(GLM_PI / 2.0) + 0.0001;
             av[i].x = 0;
         }
     }
@@ -187,8 +187,8 @@ void CameraControllerDecelerate(ecs_iter_t *it) {
 
 static
 void CameraAutoMove(ecs_iter_t *it) {
-    EcsVelocity3 *v = ecs_field(it, EcsVelocity3, 1);
-    EcsCameraAutoMove *m = ecs_field(it, EcsCameraAutoMove, 2);
+    EcsVelocity3 *v = ecs_field(it, EcsVelocity3, 0);
+    EcsCameraAutoMove *m = ecs_field(it, EcsCameraAutoMove, 1);
 
     float dt = it->delta_time;
 
@@ -204,27 +204,7 @@ void CameraAutoMove(ecs_iter_t *it) {
     }
 }
 
-void FlecsGameCameraControllerImport(ecs_world_t *world) {
-    ECS_SYSTEM(world, CameraControllerAddPosition, EcsOnLoad,
-        [none]   flecs.components.graphics.Camera,
-        [none]   CameraController,
-        [out]    !flecs.components.transform.Position3);
-
-    ECS_SYSTEM(world, CameraControllerAddRotation, EcsOnLoad,
-        [none]   flecs.components.graphics.Camera,
-        [none]   CameraController,
-        [out]    !flecs.components.transform.Rotation3);
-
-    ECS_SYSTEM(world, CameraControllerAddVelocity, EcsOnLoad,
-        [none]   flecs.components.graphics.Camera,
-        [none]   CameraController,
-        [out]    !flecs.components.physics.Velocity3);
-
-    ECS_SYSTEM(world, CameraControllerAddAngularVelocity, EcsOnLoad,
-        [none]   flecs.components.graphics.Camera,
-        [none]   CameraController,
-        [out]    !flecs.components.physics.AngularVelocity);
-
+void FlecsGameCameraControllerImport(ecs_world_t *world) {    
     ECS_SYSTEM(world, CameraControllerSyncPosition, EcsOnUpdate,
         [out]    flecs.components.graphics.Camera, 
         [in]     flecs.components.transform.Position3,
@@ -257,4 +237,9 @@ void FlecsGameCameraControllerImport(ecs_world_t *world) {
     ECS_SYSTEM(world, CameraAutoMove, EcsOnUpdate,
         [inout]  flecs.components.physics.Velocity3,
         [inout]  CameraAutoMove);
+
+    ecs_add_pair(world, ecs_id(EcsCameraController), EcsWith, ecs_id(EcsPosition3));
+    ecs_add_pair(world, ecs_id(EcsCameraController), EcsWith, ecs_id(EcsRotation3));
+    ecs_add_pair(world, ecs_id(EcsCameraController), EcsWith, ecs_id(EcsVelocity3));
+    ecs_add_pair(world, ecs_id(EcsCameraController), EcsWith, ecs_id(EcsAngularVelocity));
 }

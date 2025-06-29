@@ -2,8 +2,8 @@
 
 static
 void LightControllerSyncPosition(ecs_iter_t *it) {
-    EcsDirectionalLight *light = ecs_field(it, EcsDirectionalLight, 1);
-    EcsPosition3 *p = ecs_field(it, EcsPosition3, 2);
+    EcsDirectionalLight *light = ecs_field(it, EcsDirectionalLight, 0);
+    EcsPosition3 *p = ecs_field(it, EcsPosition3, 1);
 
     for (int i = 0; i < it->count; i ++) {
         light[i].position[0] = p[i].x;
@@ -14,9 +14,9 @@ void LightControllerSyncPosition(ecs_iter_t *it) {
 
 static
 void LightControllerSyncRotation(ecs_iter_t *it) {
-    EcsDirectionalLight *light = ecs_field(it, EcsDirectionalLight, 1);
-    EcsPosition3 *p = ecs_field(it, EcsPosition3, 2);
-    EcsRotation3 *r = ecs_field(it, EcsRotation3, 3);
+    EcsDirectionalLight *light = ecs_field(it, EcsDirectionalLight, 0);
+    EcsPosition3 *p = ecs_field(it, EcsPosition3, 1);
+    EcsRotation3 *r = ecs_field(it, EcsRotation3, 2);
 
     for (int i = 0; i < it->count; i ++) {
         light[i].direction[0] = p[i].x + sin(r[i].y) * cos(r[i].x);
@@ -27,8 +27,8 @@ void LightControllerSyncRotation(ecs_iter_t *it) {
 
 static
 void LightControllerSyncColor(ecs_iter_t *it) {
-    EcsDirectionalLight *light = ecs_field(it, EcsDirectionalLight, 1);
-    EcsRgb *color = ecs_field(it, EcsRgb, 2);
+    EcsDirectionalLight *light = ecs_field(it, EcsDirectionalLight, 0);
+    EcsRgb *color = ecs_field(it, EcsRgb, 1);
 
     for (int i = 0; i < it->count; i ++) {
         light[i].color[0] = color[i].r;
@@ -39,8 +39,8 @@ void LightControllerSyncColor(ecs_iter_t *it) {
 
 static
 void LightControllerSyncIntensity(ecs_iter_t *it) {
-    EcsDirectionalLight *light = ecs_field(it, EcsDirectionalLight, 1);
-    EcsLightIntensity *intensity = ecs_field(it, EcsLightIntensity, 2);
+    EcsDirectionalLight *light = ecs_field(it, EcsDirectionalLight, 0);
+    EcsLightIntensity *intensity = ecs_field(it, EcsLightIntensity, 1);
 
     for (int i = 0; i < it->count; i ++) {
         light[i].intensity = intensity[i].value;
@@ -49,13 +49,13 @@ void LightControllerSyncIntensity(ecs_iter_t *it) {
 
 static
 void TimeOfDayUpdate(ecs_iter_t *it) {
-    EcsTimeOfDay *tod = ecs_field(it, EcsTimeOfDay, 1);
-    tod->t += it->delta_time * tod->speed;
+    EcsTimeOfDay *tod = ecs_field(it, EcsTimeOfDay, 0);
+    tod->t += it->delta_system_time * tod->speed;
 }
 
 static
 float get_time_of_day(float t) {
-    return (t + 1.0) * M_PI;
+    return (t + 1.0) * GLM_PI;
 }
 
 static
@@ -65,10 +65,10 @@ float get_sun_height(float t) {
 
 static
 void LightControllerTimeOfDay(ecs_iter_t *it) {
-    EcsTimeOfDay *tod = ecs_field(it, EcsTimeOfDay, 1);
-    EcsRotation3 *r = ecs_field(it, EcsRotation3, 2);
-    EcsRgb *color = ecs_field(it, EcsRgb, 3);
-    EcsLightIntensity *light_intensity = ecs_field(it, EcsLightIntensity, 4);
+    EcsTimeOfDay *tod = ecs_field(it, EcsTimeOfDay, 0);
+    EcsRotation3 *r = ecs_field(it, EcsRotation3, 1);
+    EcsRgb *color = ecs_field(it, EcsRgb, 2);
+    EcsLightIntensity *light_intensity = ecs_field(it, EcsLightIntensity, 3);
 
     static vec3 day = {0.8, 0.8, 0.75};
     static vec3 twilight = {1.0, 0.1, 0.01};
@@ -87,8 +87,7 @@ void LightControllerTimeOfDay(ecs_iter_t *it) {
             glm_vec3_copy(day, sun_color);
         }
 
-        /* increase just before sunrise/after sunset*/
-        float intensity = t_sin + 0.07;
+        float intensity = t_sin;
         if (intensity < 0) {
             intensity = 0;
         }
@@ -102,8 +101,8 @@ void LightControllerTimeOfDay(ecs_iter_t *it) {
 
 static
 void AmbientLightControllerTimeOfDay(ecs_iter_t *it) {
-    EcsTimeOfDay *tod = ecs_field(it, EcsTimeOfDay, 1);
-    EcsCanvas *canvas = ecs_field(it, EcsCanvas, 2);
+    EcsTimeOfDay *tod = ecs_field(it, EcsTimeOfDay, 0);
+    EcsCanvas *canvas = ecs_field(it, EcsCanvas, 1);
 
     static vec3 ambient_day = {0.03, 0.06, 0.09};
     static vec3 ambient_night = {0.001, 0.008, 0.016};
@@ -162,4 +161,9 @@ void FlecsGameLightControllerImport(ecs_world_t *world) {
     ecs_add_pair(world, EcsSun, EcsWith, ecs_id(EcsDirectionalLight));
     ecs_add_pair(world, EcsSun, EcsWith, ecs_id(EcsRgb));
     ecs_add_pair(world, EcsSun, EcsWith, ecs_id(EcsLightIntensity));
+
+    ecs_system(world, {
+        .entity = ecs_id(TimeOfDayUpdate),
+        .interval = 1.0
+    });
 }

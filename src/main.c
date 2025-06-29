@@ -8,7 +8,16 @@ ECS_DECLARE(EcsCameraController);
 
 void FlecsGameCameraControllerImport(ecs_world_t *world);
 void FlecsGameLightControllerImport(ecs_world_t *world);
-void FlecsGameWorldCellsImport(ecs_world_t *world);
+
+ECS_CTOR(EcsParticleEmitter, ptr, {
+    ptr->particle = 0;
+    ptr->spawn_interval = 1.0;
+    ptr->lifespan = 1000.0;
+    ptr->size_decay = 1.0;
+    ptr->color_decay = 1.0;
+    ptr->velocity_decay = 1.0;
+    ptr->t = 0;
+})
 
 static
 float randf(float max) {
@@ -49,16 +58,19 @@ ecs_entity_t get_prefab(
      * use assemblies directly vs. having to create a dummy prefab */
     ecs_entity_t result = prefab;
     if (ecs_has(world, prefab, EcsScript) && ecs_has(world, prefab, EcsComponent)) {
-        result = ecs_new(world, 0);
+        result = ecs_new(world);
+        ecs_add_pair(world, result, EcsChildOf, parent);
         ecs_add_id(world, result, EcsPrefab);
         ecs_add_id(world, result, prefab);
     }
+
     return result;
 }
 
 static
 ecs_entity_t generate_tile(
     ecs_world_t *world,
+    ecs_entity_t parent,
     const EcsGrid *grid,
     float xc,
     float yc,
@@ -88,8 +100,9 @@ ecs_entity_t generate_tile(
             }
         }
     }
-
-    ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, slot);
+    
+    ecs_entity_t inst = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_add_pair(world, inst, EcsIsA, slot);
     ecs_set(world, inst, EcsPosition3, {xc, yc, zc});
     return inst;
 }
@@ -126,8 +139,6 @@ void generate_grid(
     params.y_var = grid->y.variation;
     params.z_var = grid->z.variation;
 
-    ecs_entity_t old_scope = ecs_set_scope(world, parent);
-
     ecs_entity_t prefab = grid->prefab;
     params.variations_total = 0;
     params.variations_count = 0;
@@ -156,7 +167,7 @@ void generate_grid(
                     float xc = (float)x * params.x_spacing - params.x_half;
                     float yc = (float)y * params.y_spacing - params.y_half;
                     float zc = (float)z * params.z_spacing - params.z_half;
-                    generate_tile(world, grid, xc, yc, zc, &params);
+                    generate_tile(world, parent, grid, xc, yc, zc, &params);
                 }
             }
         }
@@ -164,32 +175,102 @@ void generate_grid(
         for (int32_t x = 0; x < params.x_count; x ++) {
             float xc = (float)x * params.x_spacing - params.x_half;
             float zc = grid->border.z / 2 + grid->border_offset.z;
-            generate_tile(world, grid, xc, 0, -zc, &params);
-            generate_tile(world, grid, xc, 0, zc, &params);
+            generate_tile(world, parent, grid, xc, 0, -zc, &params);
+            generate_tile(world, parent, grid, xc, 0, zc, &params);
         }
 
         for (int32_t x = 0; x < params.z_count; x ++) {
             float xc = grid->border.x / 2 + grid->border_offset.x;
             float zc = (float)x * params.z_spacing - params.z_half;
             ecs_entity_t inst;
-            inst = generate_tile(world, grid, xc, 0, zc, &params);
-            ecs_set(world, inst, EcsRotation3, {0, M_PI / 2, 0});
-            inst = generate_tile(world, grid, -xc, 0, zc, &params);
-            ecs_set(world, inst, EcsRotation3, {0, M_PI / 2, 0});
+            inst = generate_tile(world, parent, grid, xc, 0, zc, &params);
+            ecs_set(world, inst, EcsRotation3, {0, GLM_PI / 2, 0});
+            inst = generate_tile(world, parent, grid, -xc, 0, zc, &params);
+            ecs_set(world, inst, EcsRotation3, {0, GLM_PI / 2, 0});
         }
     }
-
-    ecs_set_scope(world, old_scope);
 }
 
 static
 void SetGrid(ecs_iter_t *it) {
-    EcsGrid *grid = ecs_field(it, EcsGrid, 1);
+    EcsGrid *grid = ecs_field(it, EcsGrid, 0);
 
     for (int i = 0; i < it->count; i ++) {
-        ecs_entity_t g = it->entities[0];
+        ecs_entity_t g = it->entities[i];
         ecs_delete_with(it->world, ecs_pair(EcsChildOf, g));
         generate_grid(it->world, g, &grid[i]);
+    }
+}
+
+static
+void ParticleEmit(ecs_iter_t *it) {
+    EcsParticleEmitter *e = ecs_field(it, EcsParticleEmitter, 0);
+    EcsBox *box = ecs_field(it, EcsBox, 1);
+
+    for (int i = 0; i < it->count; i ++) {
+        e->t += it->delta_time;
+        if (e->t > e->spawn_interval) {
+            e->t -= e->spawn_interval;
+
+            ecs_entity_t p = ecs_insert(it->world, 
+                {ecs_childof(it->entities[i])},
+                {ecs_isa(e->particle)},
+                ecs_value(EcsParticle, {
+                    .t = e->lifespan
+                }));
+
+            if (box) {
+                EcsPosition3 pos = {0, 0, 0};
+                pos.x = randf(box[i].width) - box[i].width / 2;
+                pos.y = randf(box[i].height) - box[i].height / 2;
+                pos.z = randf(box[i].depth) - box[i].depth / 2;
+                ecs_set_ptr(it->world, p, EcsPosition3, &pos);
+            }
+
+            ecs_set(it->world, p, EcsRotation3, { 0, randf(4 * 3.1415926), 0 });
+        }
+    }
+}
+
+static
+void ParticleProgress(ecs_iter_t *it) {
+    EcsParticle *p = ecs_field(it, EcsParticle, 0);
+    EcsParticleEmitter *e = ecs_field(it, EcsParticleEmitter, 1);
+    EcsBox *box = ecs_field(it, EcsBox, 2);
+    EcsRgb *color = ecs_field(it, EcsRgb, 3);
+    EcsVelocity3 *vel = ecs_field(it, EcsVelocity3, 4);
+
+    for (int i = 0; i < it->count; i ++) {
+        p[i].t -= it->delta_time;
+        if (p[i].t <= 0) {
+            ecs_delete(it->world, it->entities[i]);
+        }
+    }
+
+    if (box) {
+        for (int i = 0; i < it->count; i ++) {
+            box[i].width *= pow(e->size_decay, it->delta_time);
+            box[i].height *= pow(e->size_decay, it->delta_time);
+            box[i].depth *= pow(e->size_decay, it->delta_time);
+
+            if ((box[i].width + box[i].height + box[i].depth) < 0.1) {
+                ecs_delete(it->world, it->entities[i]);
+            }
+        }
+    }
+    if (color) {
+        for (int i = 0; i < it->count; i ++) {
+            color[i].r *= pow(e->color_decay, it->delta_time);
+            color[i].g *= pow(e->color_decay, it->delta_time);
+            color[i].b *= pow(e->color_decay, it->delta_time);
+        } 
+    }
+    if (vel) {
+        for (int i = 0; i < it->count; i ++) {
+            vel[i].x *= pow(e->velocity_decay, it->delta_time);
+            vel[i].y *= pow(e->velocity_decay, it->delta_time);
+            vel[i].z *= pow(e->velocity_decay, it->delta_time);
+        }
     }
 }
 
@@ -207,19 +288,34 @@ void FlecsGameImport(ecs_world_t *world) {
 
     ECS_TAG_DEFINE(world, EcsCameraController);
     ECS_META_COMPONENT(world, EcsCameraAutoMove);
-    ECS_META_COMPONENT(world, EcsWorldCellCoord);
     ECS_META_COMPONENT(world, EcsTimeOfDay);
     ECS_META_COMPONENT(world, ecs_grid_slot_t);
     ECS_META_COMPONENT(world, ecs_grid_coord_t);
     ECS_META_COMPONENT(world, EcsGrid);
+    ECS_META_COMPONENT(world, EcsParticleEmitter);
+    ECS_META_COMPONENT(world, EcsParticle);
 
     FlecsGameCameraControllerImport(world);
     FlecsGameLightControllerImport(world);
-    FlecsGameWorldCellsImport(world);
 
     ecs_set_hooks(world, EcsTimeOfDay, {
-        .ctor = ecs_default_ctor
+        .ctor = flecs_default_ctor
     });
 
     ECS_OBSERVER(world, SetGrid, EcsOnSet, Grid);
+
+    ecs_set_hooks(world, EcsParticleEmitter, {
+        .ctor = ecs_ctor(EcsParticleEmitter)
+    });
+
+    ECS_SYSTEM(world, ParticleEmit, EcsOnUpdate, 
+        ParticleEmitter,
+        ?flecs.components.geometry.Box);
+
+    ECS_SYSTEM(world, ParticleProgress, EcsOnUpdate, 
+        Particle, 
+        ParticleEmitter(up),
+        ?flecs.components.geometry.Box(self),
+        ?flecs.components.graphics.Rgb(self),
+        ?flecs.components.physics.Velocity3(self));
 }
